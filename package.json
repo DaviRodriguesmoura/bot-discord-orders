@@ -1,6 +1,13 @@
 {
+  "name": "bot-discord-dev-store",
+  "version": "1.0.0",
+  "description": "Bot Discord Dev Store",
+  "main": "index.js",
   "scripts": {
     "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18.x"
   },
   "dependencies": {
     "axios": "^1.11.0",
@@ -8,6 +15,7 @@
     "discord.js": "^14.22.1",
     "fast-glob": "^3.3.3",
     "lodash": "^4.17.21",
-    "wio.db": "^4.0.22"
+    "wio.db": "^4.0.22",
+    "express": "^4.19.2"
   }
 }
