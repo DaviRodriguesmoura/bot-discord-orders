@@ -1,8 +1,8 @@
 {
-    "token": "sua-token",
-    "apiKey": "api-mginex",
-    "guildId": "id-servidor",
-    "categoryId": "categoria-carrinho",
+    "token": "MTQ2MzE3MzQ3NDAzNzI2ODUyMQ.Gd9hvl.mfaVObhhEroEyuqvtIyoYf7T7YKPdrHADGSKUA",
+    "apiKey": "019be60b-582c-75b2-91eb-652bf8b4dbf1-019be60b-582c-75b2-91eb-652c3ad856dd",
+    "guildId": "1462516806018138309",
+    "categoryId": "1462937473939280073",
     "emojis": {
         "paymentMethods": {
             "PIX": "🎁",
