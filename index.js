@@ -1,6 +1,19 @@
 const { Client } = require("discord.js");
 const Discord = require("discord.js");
-const config = require("./config.json");
+const config = {
+  token: process.env.DISCORD_TOKEN,
+  apiKey: process.env.MGNEX_API_KEY,
+  guildId: process.env.DISCORD_GUILD_ID,
+  categoryId: process.env.DISCORD_CATEGORY_ID,
+  // Mantenha os emojis e métodos de pagamento se eles estiverem no config.json original
+  emojis: {
+    paymentMethods: {
+      PIX: "💸",
+      MERCADO_PAGO: "🎁",
+      STRIPE: "💳"
+    }
+  }
+};
 const fg = require("fast-glob");
 const { api, db } = require("./@shared");
 
