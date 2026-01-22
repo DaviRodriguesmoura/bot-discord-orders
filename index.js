@@ -1,90 +1,68 @@
-const express = require("express");
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
-const fg = require("fast-glob");
-const { api, db } = require("./@shared");
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const logger = require("./utils/logger");
 
-const config = {
-  token: process.env.DISCORD_TOKEN,
-  apiKey: process.env.MGNEX_API_KEY,
-  guildId: process.env.DISCORD_GUILD_ID,
-  categoryId: process.env.DISCORD_CATEGORY_ID,
-};
-
+/* ===== CLIENT ===== */
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessageReactions
-  ],
+    GatewayIntentBits.MessageContent
+  ]
 });
 
-const commandContainer = new Collection();
+client.commands = new Collection();
 
-/* ====== COMMANDS ====== */
-fg.sync("commands/**/*.js").forEach(file => {
-  const command = require(`./${file}`);
-  commandContainer.set(command.options.name, command);
+/* ===== LOAD COMMANDS ===== */
+const commandsPath = path.join(__dirname, "commands");
+fs.readdirSync(commandsPath).forEach(file => {
+  const command = require(`./commands/${file}`);
+  client.commands.set(command.data.name, command);
 });
 
-/* ====== EVENTS ====== */
-fg.sync("events/**/*.js").forEach(file => {
-  const event = require(`./${file}`);
-  client.on(event.type, (...args) => event.execute(...args, client));
-});
-
-/* ====== WORKERS ====== */
-fg.sync("workers/**/*.js").forEach(file => {
-  const worker = require(`./${file}`);
-  worker.execute(client);
-});
-
-/* ====== INTERACTIONS ====== */
-client.on("interactionCreate", interaction => {
-  if (!interaction.isChatInputCommand()) return;
-  const command = commandContainer.get(interaction.commandName);
-  if (command) command.execute(interaction);
-});
-
-/* ====== READY ====== */
-client.once("ready", async () => {
-  console.log(`🤖 Bot conectado: ${client.user.tag}`);
-
-  try {
-    const req = await api.get("/open-api/store");
-    db.set("store", req.data.store);
-
-    console.log(`🏪 Loja conectada: ${req.data.store.settings.title}`);
-    console.log(`🌐 URL da loja: ${req.data.store.url}`);
-
-    const guild = await client.guilds.fetch(config.guildId);
-    console.log(`✅ Servidor conectado: ${guild.name}`);
-
-    await guild.channels.fetch(config.categoryId);
-
-    await client.application.commands.set(
-      commandContainer.map(cmd => cmd.options)
-    );
-
-  } catch (err) {
-    console.error("❌ Erro ao conectar loja ou servidor:", err.message);
+/* ===== LOAD EVENTS ===== */
+const eventsPath = path.join(__dirname, "events");
+fs.readdirSync(eventsPath).forEach(file => {
+  const event = require(`./events/${file}`);
+  if (event.once) {
+    client.once(event.name, (...args) => event.execute(...args, client));
+  } else {
+    client.on(event.name, (...args) => event.execute(...args, client));
   }
 });
 
-/* ====== LOGIN ====== */
-client.login(config.token).catch(err => {
-  console.error("❌ Erro ao logar o bot:", err.message);
+/* ===== INTERACTIONS ===== */
+client.on("interactionCreate", async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+
+  try {
+    await command.execute(interaction);
+  } catch (err) {
+    logger.error(err);
+    if (interaction.replied || interaction.deferred) return;
+    interaction.reply({ content: "❌ Erro ao executar o comando.", ephemeral: true });
+  }
 });
 
-/* ====== WEB SERVER (OBRIGATÓRIO NO RAILWAY) ====== */
+/* ===== LOGIN ===== */
+client.login(process.env.DISCORD_TOKEN).catch(err => {
+  logger.error("Token inválido ou erro ao logar.");
+  console.error(err);
+});
+
+/* ===== WEB SERVER (RAILWAY SAFE) ===== */
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get("/", (req, res) => {
+app.get("/", (_, res) => {
   res.send("🚀 Bot Dev Store Online");
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🌐 Web server rodando na porta ${PORT}`);
+  logger.info(`Web server ativo na porta ${PORT}`);
 });
