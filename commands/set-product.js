@@ -1,95 +1,24 @@
-const {
-    ApplicationCommandType,
-    ApplicationCommandOptionType,
-    ComponentType,
-    TextInputStyle,
-    PermissionFlagsBits,
-} = require("discord.js");
-const { api } = require("../@shared");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
 module.exports = {
-    options: {
-        name: "setar-produto",
-        type: ApplicationCommandType.ChatInput,
-        description: "Setar o produto do servidor.",
-        options: [
-            {
-                name: "id-produto",
-                description: "Selecione o ID do produto",
-                type: ApplicationCommandOptionType.String,
-                autocomplete: true,
-                required: true,
-            },
-        ],
-    },
-    async execute(interaction) {
-        const productId = interaction.options.getString("id-produto");
+  data: new SlashCommandBuilder()
+    .setName("loja")
+    .setDescription("Ver produtos disponíveis"),
 
-        if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator))
-            return interaction.reply({
-                content: "Você não está autorizado usar este comando",
-                ephemeral: true,
-            });
+  async execute(interaction) {
+    const embed = new EmbedBuilder()
+      .setTitle("🛍️ Dev Store")
+      .setDescription(
+        "✨ Créditos Lovable.dev disponíveis\n\n" +
+        "✅ Ativação imediata\n" +
+        "⚡ Entrega rápida\n" +
+        "💬 Suporte via WhatsApp\n\n" +
+        "👉 **Fale conosco:**\n" +
+        "📲 https://wa.me/556181203599"
+      )
+      .setColor(0x7c3aed)
+      .setFooter({ text: "Dev Store • Compra segura" });
 
-        api.get(`/open-api/catalog/product/${productId}`).then((response) => {
-            const product = response.data;
-
-            interaction.showModal({
-                customId: `set-product:${productId}`,
-                title: "Setar Produto",
-                components: [
-                    {
-                        type: ComponentType.ActionRow,
-                        components: [
-                            {
-                                custom_id: "title",
-                                label: "Título",
-                                type: ComponentType.TextInput,
-                                style: TextInputStyle.Short,
-                                value: product.info.title.slice(0, 100),
-                            },
-                        ],
-                    },
-                    {
-                        type: ComponentType.ActionRow,
-                        components: [
-                            {
-                                custom_id: "description",
-                                label: "Descrição",
-                                type: ComponentType.TextInput,
-                                style: TextInputStyle.Paragraph,
-                                value: product.info.description?.slice(0, 1000),
-                                required: false,
-                            },
-                        ],
-                    },
-                    {
-                        type: ComponentType.ActionRow,
-                        components: [
-                            {
-                                custom_id: "image",
-                                label: "Imagem",
-                                type: ComponentType.TextInput,
-                                style: TextInputStyle.Short,
-                                value: product.info.mainImage,
-                                required: false,
-                            },
-                        ],
-                    },
-                    {
-                        type: ComponentType.ActionRow,
-                        components: [
-                            {
-                                custom_id: "footer",
-                                label: "Rodapé",
-                                type: ComponentType.TextInput,
-                                style: TextInputStyle.Short,
-                                required: false,
-                            },
-                        ],
-                    },
-                ],
-            });
-        });
-    },
+    await interaction.reply({ embeds: [embed] });
+  }
 };
