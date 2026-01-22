@@ -1,113 +1,90 @@
-const { Client } = require("discord.js");
-const Discord = require("discord.js");
+const express = require("express");
+const { Client, GatewayIntentBits, Collection } = require("discord.js");
+const fg = require("fast-glob");
+const { api, db } = require("./@shared");
+
 const config = {
   token: process.env.DISCORD_TOKEN,
   apiKey: process.env.MGNEX_API_KEY,
   guildId: process.env.DISCORD_GUILD_ID,
   categoryId: process.env.DISCORD_CATEGORY_ID,
-  // Mantenha os emojis e métodos de pagamento se eles estiverem no config.json original
-  emojis: {
-    paymentMethods: {
-      PIX: "💸",
-      MERCADO_PAGO: "🎁",
-      STRIPE: "💳"
-    }
-  }
 };
-const fg = require("fast-glob");
-const { api, db } = require("./@shared");
 
 const client = new Client({
-    intents: [
-        Discord.GatewayIntentBits.Guilds,
-        Discord.GatewayIntentBits.GuildMessages,
-        Discord.GatewayIntentBits.MessageContent,
-        Discord.GatewayIntentBits.GuildMembers,
-        Discord.GatewayIntentBits.GuildMessageReactions,
-        "32767",
-    ],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessageReactions
+  ],
 });
 
-const commandContainer = new Discord.Collection();
-fg.sync("commands/**/*.js").map((file) => {
-    const command = require(`./${file}`);
-    commandContainer.set(command.options.name, command);
+const commandContainer = new Collection();
+
+/* ====== COMMANDS ====== */
+fg.sync("commands/**/*.js").forEach(file => {
+  const command = require(`./${file}`);
+  commandContainer.set(command.options.name, command);
 });
 
-fg.sync("events/**/*.js").map((file) => {
-    const event = require(`./${file}`);
-
-    client.on(event.type, (...args) => event.execute(...args, client));
+/* ====== EVENTS ====== */
+fg.sync("events/**/*.js").forEach(file => {
+  const event = require(`./${file}`);
+  client.on(event.type, (...args) => event.execute(...args, client));
 });
 
-fg.sync("workers/**/*.js").map((file) => {
-    const worker = require(`./${file}`);
-
-    worker.execute(client);
+/* ====== WORKERS ====== */
+fg.sync("workers/**/*.js").forEach(file => {
+  const worker = require(`./${file}`);
+  worker.execute(client);
 });
 
-client.on("interactionCreate", (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
-
-    const command = commandContainer.get(interaction.commandName);
-    command.execute(interaction);
+/* ====== INTERACTIONS ====== */
+client.on("interactionCreate", interaction => {
+  if (!interaction.isChatInputCommand()) return;
+  const command = commandContainer.get(interaction.commandName);
+  if (command) command.execute(interaction);
 });
 
-const logger = {
-    error: function (...args) {
-        return console.error("[❌ ERRO]", ...args);
-    },
-    info: function (...args) {
-        return console.info("[💜 INFO]", ...args);
-    },
-    warn: function (...args) {
-        return console.warn("[🟡 IMPORTANTE]", ...args);
-    },
-};
+/* ====== READY ====== */
+client.once("ready", async () => {
+  console.log(`🤖 Bot conectado: ${client.user.tag}`);
 
-(async () => {
-    try {
-        const req = await api.get("/open-api/store");
+  try {
+    const req = await api.get("/open-api/store");
+    db.set("store", req.data.store);
 
-        db.set("store", req.data.store);
+    console.log(`🏪 Loja conectada: ${req.data.store.settings.title}`);
+    console.log(`🌐 URL da loja: ${req.data.store.url}`);
 
-        client.on("clientReady", () => {
-            logger.info(`Bot conectado: ${client.user.displayName}`);
-            logger.info(`Loja conectada: ${req.data.store.settings.title}`);
-            logger.info(`URL da loja: ${req.data.store.url}`);
+    const guild = await client.guilds.fetch(config.guildId);
+    console.log(`✅ Servidor conectado: ${guild.name}`);
 
-            client.guilds
-                .fetch(config.guildId)
-                .catch(() => {
-                    logger.error(`O servidor (${config.guildId}) não foi encontrado neste bot.`);
-                    process.exit(1);
-                })
-                .then((guild) => {
-                    logger.info(`Servidor conectado: ${guild.name}`);
-                    guild.channels.fetch(config.categoryId).catch(() => {
-                        logger.error(
-                            `A categoria do carrinho (${config.categoryId}) não foi encontrado no servidor (${guild.name}).`
-                        );
-                        process.exit(1);
-                    });
-                });
+    await guild.channels.fetch(config.categoryId);
 
-            client.application.commands.set(
-                commandContainer.map((command) => {
-                    return command.options;
-                })
-            );
-        });
+    await client.application.commands.set(
+      commandContainer.map(cmd => cmd.options)
+    );
 
-        client.login(config.token).catch((err) => {
-            if (err?.name?.includes("TokenInvalid")) return logger.error("A token do bot está inválida");
-            if (err?.message?.includes("Used disallowed intents"))
-                return logger.error(
-                    "Você precisa habilitar as permissões de itents: Presence Intent, Server Members Intent, Message Content Intent"
-                );
-            return logger.error(err?.message);
-        });
-    } catch (error) {
-        logger.error("A chave de acesso da API mginex está inválida, siga o tutorial: https://www.youtube.com/@mginex");
-    }
-})();
+  } catch (err) {
+    console.error("❌ Erro ao conectar loja ou servidor:", err.message);
+  }
+});
+
+/* ====== LOGIN ====== */
+client.login(config.token).catch(err => {
+  console.error("❌ Erro ao logar o bot:", err.message);
+});
+
+/* ====== WEB SERVER (OBRIGATÓRIO NO RAILWAY) ====== */
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get("/", (req, res) => {
+  res.send("🚀 Bot Dev Store Online");
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🌐 Web server rodando na porta ${PORT}`);
+});
